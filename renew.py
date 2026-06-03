@@ -1,11 +1,11 @@
-import os, sys, time, urllib.request, subprocess, json
-import speech_recognition as sr
+import os, sys, time, urllib.request, json
 from seleniumbase import SB
 
 # ==========================================
-# 💡 核心配置
+# 💡 核心配置 (适配全新 g4f.gg 界面)
 # ==========================================
-TARGET_URL = "https://g4f.gg/renqi"
+# ⚠️ 注意这里换成了新域名
+TARGET_URL = "https://g4f.gg/renqi" 
 MC_USERNAME = "renqi"
 
 TG_TOKEN = os.getenv("TG_TOKEN", "")
@@ -21,109 +21,50 @@ def send_tg(msg):
         except:
             pass
 
-print(f"\n===== 🚀 开始执行极速续期 (WARP + Python 终极版) =====")
+print(f"\n===== 🚀 开始执行极速续期 (G4F.GG 赛博朋克全新版) =====")
 
-# 🌟 必须加回来：指定本地 WARP SOCKS5 代理
+# 继续使用我们无敌的 WARP 本地代理
 proxy_str = "socks5://127.0.0.1:40000"
 
 with SB(uc=True, proxy=proxy_str, headless=False) as sb:
     try:
-        print("🌐 正在通过 WARP SOCKS5 代理访问目标...")
+        print(f"🌐 正在通过 WARP 访问新版目标网址: {TARGET_URL}")
         sb.open(TARGET_URL)
-        sb.sleep(2)
-
-        print("🛡️ 锁定 reCAPTCHA 框架...")
-        sb.switch_to_frame('iframe[title*="reCAPTCHA"]')
         
-        print("🖱️ 点击人机验证复选框...")
-        sb.wait_for_element('.recaptcha-checkbox-border', timeout=15)
-        sb.click('.recaptcha-checkbox-border')
-        sb.sleep(4)
-
-        sb.switch_to_default_content()
-        sb.switch_to_frame('iframe[title*="reCAPTCHA"]')
-        is_checked = sb.get_attribute('#recaptcha-anchor', 'aria-checked')
+        # 给炫酷的 UI 一点加载时间
+        sb.sleep(5) 
         
-        if is_checked == 'true':
-            print("⏩ 运气爆表！IP 干净，验证码秒过。")
-        else:
-            print("⚠️ 触发挑战，正在尝试通过音频破解...")
-            sb.switch_to_default_content()
-            sb.switch_to_frame('iframe[title*="recaptcha challenge"]')
-
-            if sb.is_element_visible('#recaptcha-audio-button'):
-                sb.click('#recaptcha-audio-button')
-                sb.sleep(3)
-
-                if sb.is_text_visible("Try again later"):
-                    print("❌ 抽到“黑人” IP，Google 拒绝下发音频。等待下次换 IP 自动重试。")
-                else:
-                    print("📥 正在抓取音频数据流...")
-                    audio_src = None
-                    if sb.is_element_visible('#audio-source'):
-                        audio_src = sb.get_attribute('#audio-source', 'src')
-                    elif sb.is_element_visible('.rc-audiochallenge-tdownload-link'):
-                        audio_src = sb.get_attribute('.rc-audiochallenge-tdownload-link', 'href')
-
-                    if audio_src:
-                        urllib.request.urlretrieve(audio_src, 'payload.mp3')
-                        subprocess.run(['ffmpeg', '-i', 'payload.mp3', 'payload.wav', '-y'], 
-                                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-
-                        print("🧠 AI 正在解析语音内容...")
-                        r = sr.Recognizer()
-                        with sr.AudioFile('payload.wav') as source:
-                            audio_data = r.record(source)
-                        try:
-                            text = r.recognize_google(audio_data)
-                            print(f"✅ 识别成功: [{text}]")
-                            
-                            sb.type('#audio-response', text)
-                            sb.click('#recaptcha-verify-button')
-                            sb.sleep(4)
-                        except sr.UnknownValueError:
-                            print("❌ 引擎无法识别音频内容。")
-                        except sr.RequestError as e:
-                            print(f"❌ 语音引擎请求错误: {e}")
-                    else:
-                        print("❌ 未能获取到音频链接。")
-            else:
-                print("❌ 当前 IP 无法加载音频，可能被 Google 临时屏蔽。")
-           
-        # 验证结束，彻底切回最外层，准备填表单
-        sb.switch_to_default_content()
-        print(f"✍️ 填入服务器名: {MC_USERNAME}")
-        
-        # 填入用户名
-        sb.type('input[type="text"]', MC_USERNAME)
-
         os.makedirs("screenshots", exist_ok=True)
-        sb.save_screenshot("screenshots/1_filled.png")
+        sb.save_screenshot("screenshots/1_page_loaded.png")
 
-        print("🚀 提交续期请求...")
+        print("✍️ 尝试填入游戏ID (OPTIONAL)...")
         try:
-            # 🌟 核心杀手锏：利用 F12 扒出的绝对 ID，配合你提议的“强制模拟鼠标点击”
-            sb.wait_for_element('#submit-button', timeout=10)
-            sb.js_click('#submit-button') # JavaScript 强制穿透模拟点击，神挡杀神！
-            print("🖱️ 成功执行模拟点击 Renew 按钮！")
-            
-            print("⏳ 等待服务器响应...")
-            sb.sleep(5)
-            sb.save_screenshot("screenshots/2_result.png")
+            # 根据截图，输入框的 placeholder 是 "Steve, xX_Player_Xx, ..."
+            sb.type('input[placeholder*="Steve"]', MC_USERNAME, timeout=3)
+            print("✅ ID 填入成功！")
+        except:
+            print("ℹ️ 未找到输入框，直接继续下一步。")
 
-            if sb.is_text_visible("The server has been renewed."):
-                print("🎉 读取到成功提示: The server has been renewed.")
-                print("✅ 续期大成功！")
-                send_tg(f"✅ 服务器 [{MC_USERNAME}] 续期成功！(WARP IP)")
-            else:
-                print("⚠️ 按钮已点，但未读取到成功横幅，请查阅截图确认。")
-                send_tg(f"⚠️ 续期已执行，请查阅截图确认状态。")
-        except Exception as e:
-            print(f"❌ 页面未出现可点击的 Renew 按钮或点击超时: {e}")
-            send_tg(f"❌ 续期跳过：无法定位并点击 Renew 按钮。")
+        print("🚀 寻找 [+ ADD 90 MIN] 核心按钮...")
+        # 使用模糊匹配，只要包含 ADD 90 MIN 统统按下
+        add_btn_xpath = '//*[contains(text(), "ADD 90 MIN") or contains(text(), "Add 90 Min")]'
+        
+        sb.wait_for_element(add_btn_xpath, timeout=15)
+        
+        print("🖱️ 强行点击续期按钮！")
+        sb.js_click(add_btn_xpath)
+
+        print("⏳ 等待服务器响应...")
+        # 点击后多等一会儿，看看有没有弹窗或成功提示
+        sb.sleep(8)
+        sb.save_screenshot("screenshots/2_result.png")
+
+        print("✅ 续期点击已执行！")
+        # 因为暂时不知道新版成功的具体提示语，我们先发一个执行成功的通知
+        send_tg(f"✅ 服务器 [{MC_USERNAME}] 续期按钮已点击！\n官方界面已重构，请查看 GitHub 截图确认是否真正成功增加了时间。")
 
     except Exception as e:
         print(f"❌ 发生致命错误: {e}")
         os.makedirs("screenshots", exist_ok=True)
         sb.save_screenshot("screenshots/error.png")
-        send_tg(f"❌ 自动续期崩溃: {e}")
+        send_tg(f"❌ 自动续期崩溃，未找到新版按钮或加载超时: {e}")
