@@ -2,7 +2,7 @@ import os, sys, time, urllib.request, json
 from seleniumbase import SB
 
 # ==========================================
-# 💡 核心配置 (G4F.GG 双重核武制导版)
+# 💡 核心配置 (G4F.GG 终极散弹枪盲狙版)
 # ==========================================
 TARGET_URL = "https://g4f.gg/renqi" 
 MC_USERNAME = "renqi"
@@ -20,7 +20,7 @@ def send_tg(msg):
         except:
             pass
 
-print(f"\n===== 🚀 开始执行极速续期 (终极双重核武狙击版) =====")
+print(f"\n===== 🚀 开始执行极速续期 (终极散弹枪覆盖版) =====")
 
 proxy_str = "socks5://127.0.0.1:40000"
 
@@ -31,6 +31,8 @@ with SB(uc=True, proxy=proxy_str, headless=False, window_size="1920,1080") as sb
         os.system("sudo apt-get install -y xdotool > /dev/null 2>&1")
 
         print(f"🌐 正在通过 WARP 访问新版目标网址: {TARGET_URL}")
+        # 🌟 强制将浏览器窗口钉死在屏幕最左上角，确保物理坐标 100% 不偏移
+        sb.driver.set_window_position(0, 0)
         sb.open(TARGET_URL)
         sb.sleep(6) 
         
@@ -47,15 +49,18 @@ with SB(uc=True, proxy=proxy_str, headless=False, window_size="1920,1080") as sb
         print("🚀 触发 [+ ADD 90 MIN] 核心按钮...")
         
         js_click_code = """
-        let els = document.querySelectorAll('button, a, input, div, span');
-        for (let i = els.length - 1; i >= 0; i--) {
-            let el = els[i];
-            let text = (el.innerText || el.value || '').toUpperCase();
-            if (text.includes('ADD 90')) {
-                el.click();
-                break;
+        return (function() {
+            let els = document.querySelectorAll('button, a, input, div, span');
+            for (let i = els.length - 1; i >= 0; i--) {
+                let el = els[i];
+                let text = (el.innerText || el.value || '').toUpperCase();
+                if (text.includes('ADD 90')) {
+                    el.click();
+                    return true;
+                }
             }
-        }
+            return false;
+        })();
         """
         sb.execute_script(js_click_code)
         
@@ -64,64 +69,28 @@ with SB(uc=True, proxy=proxy_str, headless=False, window_size="1920,1080") as sb
         except:
             pass
 
-        print("⏳ 盲等 6 秒钟，等待 CF 盾在屏幕上展开...")
+        print("⏳ 盲等 6 秒钟，等待 CF 盾在屏幕正中央完全展开...")
         time.sleep(6) 
         
-        print("🛡️ 启动【穿甲雷达】模块，递归撕裂 Shadow DOM！")
+        print("🛡️ 启动【物理散弹枪覆盖】模块，对准心脏区域实施三连发！")
         
-        # 🌟 修复：引入递归函数，强行穿透所有 Shadow DOM 黑盒寻找 iframe
-        js_radar = """
-        (function() {
-            function getIframe(root) {
-                let iframes = root.querySelectorAll('iframe');
-                for(let f of iframes) {
-                    let s = (f.src || '').toLowerCase();
-                    if(s.includes('cloudflare') || s.includes('turnstile')) return f;
-                }
-                let all = root.querySelectorAll('*');
-                for(let el of all) {
-                    if(el.shadowRoot) {
-                        let found = getIframe(el.shadowRoot);
-                        if(found) return found;
-                    }
-                }
-                return null;
-            }
-            
-            let cf = getIframe(document);
-            if (cf) {
-                let rect = cf.getBoundingClientRect();
-                let ui_y = 85; 
-                let target_x = rect.left + 30;
-                let target_y = rect.top + ui_y + (rect.height / 2);
-                document.body.setAttribute('data-cf-coords', Math.round(target_x) + ',' + Math.round(target_y));
-            } else {
-                document.body.setAttribute('data-cf-coords', 'NOT_FOUND');
-            }
-        })();
-        """
-        sb.execute_script(js_radar)
+        # 🌟 核心杀手锏：火力覆盖！
+        # 屏幕是 1920x1080，中心点绝对是 (960, 540)
+        # 复选框在弹窗偏左 (X=850)，高度大约在垂直居中略偏上 (Y=510~540)
+        # Cancel 按钮在底部 (Y=600左右，绝对碰不到)
         
-        coords = None
-        try:
-            coords = sb.get_attribute("body", "data-cf-coords")
-        except:
-            pass
+        points = [
+            (850, 510), # 第一发：偏上一点
+            (850, 530), # 第二发：正中心
+            (850, 550)  # 第三发：偏下一点
+        ]
         
-        # 🌟 双重核武判定：如果雷达找到就用雷达，找不到直接启用黄金坐标！
-        if coords and coords != "NOT_FOUND":
-            target_x, target_y = coords.split(",")
-            print(f"🎯 穿甲雷达精确锁定 CF 盾绝对靶心: ({target_x}, {target_y})")
-        else:
-            print("⚠️ 雷达未能穿透深层黑盒，启用【黄金盲狙坐标】！")
-            # 在 1920x1080 且有 85px 浏览器顶栏的情况下，绝对居中遮罩的复选框永远在这！
-            target_x, target_y = "820", "580"
-            print(f"🎯 锁定黄金物理坐标: ({target_x}, {target_y})")
-
-        print("🖱️ 物理鼠标按下扳机！")
-        os.system(f"xdotool mousemove {target_x} {target_y} click 1")
+        for i, (tx, ty) in enumerate(points):
+            print(f"🎯 第 {i+1} 发子弹出膛，轰击绝对坐标: ({tx}, {ty})")
+            os.system(f"xdotool mousemove {tx} {ty} click 1")
+            time.sleep(0.5) # 给点击一点反馈时间
         
-        print("⏳ 射击完毕！静默等待 8 秒，让子弹飞一会儿 (等待盾转圈通过)...")
+        print("🖱️ 散弹三连发完毕！静默等待 8 秒，让盾转圈通过...")
         time.sleep(8)
             
         try:
@@ -131,7 +100,7 @@ with SB(uc=True, proxy=proxy_str, headless=False, window_size="1920,1080") as sb
             print("⚠️ 截图保存失败。")
 
         print("✅ 流程执行完毕！")
-        send_tg(f"✅ 服务器 [{MC_USERNAME}] 续期脚本运行完毕！\n【破盾方式: 双重核武物理盲狙】请查阅 GitHub 截图确认战果。")
+        send_tg(f"✅ 服务器 [{MC_USERNAME}] 续期脚本运行完毕！\n【破盾方式: 物理散弹火力覆盖】请查阅 GitHub 截图确认战果。")
 
     except Exception as e:
         print(f"❌ 发生致命错误: {e}")
