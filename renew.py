@@ -2,7 +2,7 @@ import os, sys, time, urllib.request, json, re
 from seleniumbase import SB
 
 # ==========================================
-# 💡 G4F.GG 自动续期脚本
+# 💡 G4F.GG 续期
 # ==========================================
 TARGETS = [
     {"name": "renqi", "url": "https://g4f.gg/renqi"},
@@ -37,18 +37,19 @@ print("\n===== 开始执行 G4F 自动续期 =====")
 proxy_str = "socks5://127.0.0.1:40000"
 task_results = []
 
-# 统一在外部预装一次物理鼠标依赖
 print("初始化物理鼠标依赖...")
 os.system("sudo apt-get update > /dev/null 2>&1")
 os.system("sudo apt-get install -y xdotool > /dev/null 2>&1")
 
-with SB(uc=True, proxy=proxy_str, headless=False, window_size="1920,1080") as sb:
-    for target in TARGETS:
-        name = target["name"]
-        url = target["url"]
-        print(f"\n开始处理节点: [{name}]")
-        
-        try:
+for target in TARGETS:
+    name = target["name"]
+    url = target["url"]
+    print(f"\n开始处理节点: [{name}]")
+    
+    try:
+        # 🌟 核心改动：将浏览器的启动放在循环内部。
+        # 确保每次循环都开启一个全新的、未被 Cloudflare 标记的纯净浏览器进程！
+        with SB(uc=True, proxy=proxy_str, headless=False, window_size="1920,1080") as sb:
             print(f"正在访问目标网址: {url}")
             sb.driver.set_window_position(0, 0)
             sb.open(url)
@@ -108,16 +109,13 @@ with SB(uc=True, proxy=proxy_str, headless=False, window_size="1920,1080") as sb
             except:
                 pass
             
-            # 将当前节点结果存入统计队列
+            # 记录当前节点的成功状态
             task_results.append({"name": name, "status": status, "time": remaining_time})
 
-        except Exception as e:
-            print(f"节点 [{name}] 执行过程中发生异常: {e}")
-            try:
-                sb.save_screenshot(f"screenshots/{name}_error.png")
-            except:
-                pass
-            task_results.append({"name": name, "status": "❌ 执行失败", "time": "未知"})
+    except Exception as e:
+        print(f"节点 [{name}] 执行过程中发生异常: {e}")
+        # 如果因为崩溃等原因跳出，不影响后续节点的执行，直接记录失败并继续
+        task_results.append({"name": name, "status": "❌ 执行失败", "time": "未知"})
 
 print("\n所有节点处理完毕，正在统一发送综合汇报...")
 send_unified_tg(task_results)
