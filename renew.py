@@ -56,7 +56,6 @@ for target in TARGETS:
             sb.save_screenshot(f"screenshots/{name}_1_page_loaded.png")
 
             print("尝试点击初始续期按钮...")
-   
             js_click_code = """
             let step1_els = document.querySelectorAll('button, a, input, div, span');
             for (let i = step1_els.length - 1; i >= 0; i--) {
@@ -87,7 +86,7 @@ for target in TARGETS:
                     os.system(f"xdotool mousemove {x} {y} click 1")
                     time.sleep(0.1)
             
-            print("点击完成")
+            print("点击完成，等待验证盾亮起绿勾...")
             time.sleep(8)
             
             print("尝试点击最后的 [VOTE - ADDS 90 MINUTES] 确认按钮...")
@@ -96,7 +95,7 @@ for target in TARGETS:
             for (let i = step2_els.length - 1; i >= 0; i--) {
                 let el = step2_els[i];
                 let text = (el.innerText || '').toUpperCase();
-                if (text.includes('VOTE') || text.includes('SUCCESS')) {
+                if (text.includes('VOTE')) {
                     el.click();
                     break;
                 }
@@ -109,8 +108,30 @@ for target in TARGETS:
             except:
                 pass
             
-            print("等待 25 秒广告或最终加载时间...")
-            time.sleep(30)
+            print("等待 22 秒让广告播放完毕并发放奖励...")
+            time.sleep(22)
+            
+            print
+            js_clear_ads = """
+            try {
+                let closeBtns = document.querySelectorAll('div, span, button, a');
+                for (let i = 0; i < closeBtns.length; i++) {
+                    let txt = (closeBtns[i].innerText || '').trim().toUpperCase();
+                    if (txt === 'X' || txt === 'CLOSE' || txt === 'SKIP') {
+                        closeBtns[i].click();
+                    }
+                }
+                document.querySelectorAll('iframe').forEach(el => el.style.display = 'none');
+                document.querySelectorAll('*').forEach(el => {
+                    let style = window.getComputedStyle(el);
+                    if (style.zIndex !== 'auto' && parseInt(style.zIndex) > 1000) {
+                        el.style.display = 'none';
+                    }
+                });
+            } catch(e) {}
+            """
+            sb.execute_script(js_clear_ads)
+            time.sleep(2) 
             
             print("获取页面剩余时间...")
             page_text = sb.get_text("body")
