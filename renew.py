@@ -25,7 +25,7 @@ def send_tg(results):
     if not TG_TOKEN or not TG_CHAT:
         return
     try:
-        lines = ["🤖 G4F Renew Status"]
+        lines = ["G4F Renew Status"]
         for res in results:
             lines.append("-----------------------")
             lines.append(f"Node: {res['name']}")
@@ -41,14 +41,11 @@ def send_tg(results):
 
 def get_time(sb):
     try:
-        sb.wait_for_element_visible('#sd-timer', timeout=10)
+        sb.wait_for_element_present('#sd-timer', timeout=15)
         time.sleep(1)
-        return sb.get_text('#sd-timer').strip()
+        return sb.execute_script("return document.querySelector('#sd-timer').innerText.trim();")
     except:
-        try:
-            return sb.execute_script("let el = document.querySelector('.countdown-card') || document.querySelector('#sd-timer'); return el ? el.innerText.trim().replace(/\\n/g, '') : 'Unknown';")
-        except:
-            return "Unknown"
+        return "Unknown"
 
 print("Task started")
 task_results = []
@@ -73,16 +70,12 @@ for target in TARGETS:
             print(f"[{name}] Loading page")
             sb.uc_open_with_reconnect(url, reconnect_time=5)
             time.sleep(random.uniform(6, 10))
-            
-            # 🌟 修复布局错位：滚动到屏幕 1/3 的黄金中间位置，确保核心面板在正中央
-            sb.execute_script("window.scrollTo(0, document.body.scrollHeight / 3);")
             sb.save_screenshot(f"screenshots/{name}_1_loaded.png")
 
             time_before = get_time(sb)
             print(f"[{name}] Initial time: {time_before}")
 
-            print(f"[{name}] Step 1: Initial click")
-            # 清除 Cookie 弹窗干扰
+            # 1. Accept Cookies
             sb.execute_script("""
                 document.querySelectorAll('button, a').forEach(b => {
                     let t = (b.innerText||'').toUpperCase();
@@ -90,31 +83,33 @@ for target in TARGETS:
                 });
             """)
             time.sleep(1)
-            
-            # 🌟 修复空点击：严格限制只搜索按钮，杜绝误点背景板
-            clicked_initial = sb.execute_script("""
-                let els = document.querySelectorAll('button, a, [role="button"]');
-                for (let el of els) {
-                    let t = (el.innerText||'').toUpperCase();
-                    if(t.includes('ADD 90') && !t.includes('VOTE')){
-                        el.click(); return true;
+
+            print(f"[{name}] Step 1: Initial click")
+            # 2. JS Click initial button directly (Immune to scroll/overlays)
+            try:
+                sb.wait_for_element_present("#sd-vote-btn", timeout=15)
+                sb.execute_script("document.querySelector('#sd-vote-btn').click();")
+            except:
+                print(f"[{name}] Warning: #sd-vote-btn not found. Trying text fallback.")
+                sb.execute_script("""
+                    let els = document.querySelectorAll('button, a, [role="button"]');
+                    for (let el of els) {
+                        let t = (el.innerText||'').toUpperCase();
+                        if(t.includes('ADD 90') && !t.includes('VOTED')){
+                            el.click(); break;
+                        }
                     }
-                }
-                return false;
-            """)
-            
-            if not clicked_initial:
-                print(f"[{name}] Initial button not found via JS, trying exact ID...")
-                try: 
-                    sb.execute_script("document.querySelector('#sd-vote-btn').click();")
-                except: 
-                    pass
+                """)
 
             time.sleep(4)
             sb.save_screenshot(f"screenshots/{name}_2_after_click1.png")
 
             print(f"[{name}] Step 2: Captcha")
-            for _ in range(3):
+            # 3. Handle CF Captcha with early exit if submit button appears
+            for _ in range(8):
+                if sb.is_element_present("#vm-submit"):
+                    print(f"[{name}] Captcha passed early")
+                    break
                 try:
                     sb.uc_gui_click_captcha()
                     time.sleep(2)
@@ -124,24 +119,26 @@ for target in TARGETS:
                 time.sleep(3)
             
             print(f"[{name}] Step 3: Submit")
-            # 🌟 修复空点击：严格匹配最终按钮的各种文字变体
-            clicked_submit = sb.execute_script("""
-                let els = document.querySelectorAll('button, a, [role="button"]');
-                for (let el of els) {
-                    let t = (el.innerText||'').toUpperCase();
-                    if(t.includes('VOTE') || t.includes('SUBMIT') || t.includes('+90')){
-                        el.click(); return true;
-                    }
-                }
-                return false;
-            """)
-            
-            if not clicked_submit:
-                print(f"[{name}] Submit button not found via JS, trying exact ID...")
-                try: 
+            # 4. JS Click submit button directly (Immune to scroll/overlays)
+            submit_clicked = False
+            for _ in range(5):
+                if sb.is_element_present("#vm-submit"):
                     sb.execute_script("document.querySelector('#vm-submit').click();")
-                except: 
-                    pass
+                    submit_clicked = True
+                    break
+                time.sleep(2)
+            
+            if not submit_clicked:
+                print(f"[{name}] Warning: #vm-submit not found. Trying text fallback.")
+                sb.execute_script("""
+                    let els = document.querySelectorAll('button, a, [role="button"]');
+                    for (let el of els) {
+                        let t = (el.innerText||'').toUpperCase();
+                        if(t.includes('VOTE') || t.includes('SUBMIT')){
+                            el.click(); break;
+                        }
+                    }
+                """)
 
             print(f"[{name}] Step 4: Wait for reward (45s)")
             time.sleep(45) 
