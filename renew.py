@@ -6,10 +6,6 @@ import json
 import random
 from seleniumbase import SB
 
-# ==========================================
-# G4F.GG 自动续期脚本 (完美融合参考框架版)
-# ==========================================
-
 if "DISPLAY" not in os.environ:
     os.environ["DISPLAY"] = ":1"
 if "XAUTHORITY" not in os.environ:
@@ -45,24 +41,14 @@ def send_tg(results):
 
 def get_time(sb):
     try:
-        sb.wait_for_element_visible('#sd-timer', timeout=15)
+        sb.wait_for_element_visible('#sd-timer', timeout=10)
         time.sleep(1)
         return sb.get_text('#sd-timer').strip()
     except:
         try:
-            return sb.execute_script("let el = document.querySelector('#sd-timer'); return el ? el.innerText.trim() : 'Unknown';")
+            return sb.execute_script("let el = document.querySelector('.countdown-card') || document.querySelector('#sd-timer'); return el ? el.innerText.trim().replace(/\\n/g, '') : 'Unknown';")
         except:
             return "Unknown"
-
-def human_action(sb):
-    """模拟人类滚动页面并随机点击空白处，防止广告遮挡及增加信任度"""
-    try:
-        sb.execute_script("window.scrollBy(0, 1000);")
-        for _ in range(2):
-            sb.slow_click("body", force=True)
-            time.sleep(random.uniform(0.5, 1.2))
-    except:
-        pass
 
 print("Task started")
 task_results = []
@@ -88,74 +74,81 @@ for target in TARGETS:
             sb.uc_open_with_reconnect(url, reconnect_time=5)
             time.sleep(random.uniform(6, 10))
             
+            # 🌟 修复布局错位：滚动到屏幕 1/3 的黄金中间位置，确保核心面板在正中央
+            sb.execute_script("window.scrollTo(0, document.body.scrollHeight / 3);")
+            sb.save_screenshot(f"screenshots/{name}_1_loaded.png")
+
             time_before = get_time(sb)
             print(f"[{name}] Initial time: {time_before}")
 
-            # 1. 处理 Cookie 弹窗
-            cookie_btns = [
-                '//button[contains(., "Recommended Cookies")]',
-                '//button[contains(., "Accept")]',
-                '//button[contains(., "I Agree")]',
-                '//button[contains(., "Consent")]'
-            ]
-            for btn in cookie_btns:
-                if sb.is_element_present(btn):
-                    try: 
-                        sb.click(btn)
-                        print(f"[{name}] Cookie accepted")
-                        break
-                    except: pass
-            time.sleep(2)
-
-            # 2. 初始点击 (滑动避开广告 -> 官方 ID 定位)
             print(f"[{name}] Step 1: Initial click")
-            human_action(sb)
-            try:
-                sb.wait_for_element_visible("#sd-vote-btn", timeout=10)
-                sb.click('#sd-vote-btn')
-            except Exception as e:
-                print(f"[{name}] Error clicking initial button: {e}")
-                sb.save_screenshot(f"screenshots/{name}_error_step1.png")
-                raise Exception("Initial button not found")
-
-            time.sleep(random.uniform(6, 10))
-
-            # 3. 循环击破 CF 人机验证盾
-            print(f"[{name}] Step 2: Captcha")
-            cf_indicators = ["verify you are human", "确认您是真人", "troubleshoot", "just a moment"]
-            for _ in range(10): # 尝试 10 次
-                try:
-                    sb.uc_gui_click_captcha()
-                    time.sleep(3)
-                    page_lower = sb.get_page_source().lower()
-                    if any(x in page_lower for x in cf_indicators):
-                        sb.uc_gui_handle_captcha()
-                        time.sleep(3)
-                        page_lower = sb.get_page_source().lower()
-                    if not any(x in page_lower for x in cf_indicators):
-                        print(f"[{name}] Captcha passed")
-                        break
-                except:
+            # 清除 Cookie 弹窗干扰
+            sb.execute_script("""
+                document.querySelectorAll('button, a').forEach(b => {
+                    let t = (b.innerText||'').toUpperCase();
+                    if(t.includes('ACCEPT') || t.includes('RECOMMENDED')) b.click();
+                });
+            """)
+            time.sleep(1)
+            
+            # 🌟 修复空点击：严格限制只搜索按钮，杜绝误点背景板
+            clicked_initial = sb.execute_script("""
+                let els = document.querySelectorAll('button, a, [role="button"]');
+                for (let el of els) {
+                    let t = (el.innerText||'').toUpperCase();
+                    if(t.includes('ADD 90') && !t.includes('VOTE')){
+                        el.click(); return true;
+                    }
+                }
+                return false;
+            """)
+            
+            if not clicked_initial:
+                print(f"[{name}] Initial button not found via JS, trying exact ID...")
+                try: 
+                    sb.execute_script("document.querySelector('#sd-vote-btn').click();")
+                except: 
                     pass
 
-            # 4. 最终确认点击
-            print(f"[{name}] Step 3: Submit")
-            try:
-                human_action(sb)
-                sb.wait_for_element_visible("#vm-submit", timeout=10)
-                sb.click('#vm-submit')
-            except Exception as e:
-                print(f"[{name}] Error clicking submit button: {e}")
-                sb.save_screenshot(f"screenshots/{name}_error_step3.png")
-                raise Exception("Submit button not found")
+            time.sleep(4)
+            sb.save_screenshot(f"screenshots/{name}_2_after_click1.png")
 
-            # 5. 等待奖励发放与刷新
-            print(f"[{name}] Step 4: Wait for reward (35s)")
-            time.sleep(35)
+            print(f"[{name}] Step 2: Captcha")
+            for _ in range(3):
+                try:
+                    sb.uc_gui_click_captcha()
+                    time.sleep(2)
+                    sb.uc_gui_handle_captcha()
+                except:
+                    pass
+                time.sleep(3)
+            
+            print(f"[{name}] Step 3: Submit")
+            # 🌟 修复空点击：严格匹配最终按钮的各种文字变体
+            clicked_submit = sb.execute_script("""
+                let els = document.querySelectorAll('button, a, [role="button"]');
+                for (let el of els) {
+                    let t = (el.innerText||'').toUpperCase();
+                    if(t.includes('VOTE') || t.includes('SUBMIT') || t.includes('+90')){
+                        el.click(); return true;
+                    }
+                }
+                return false;
+            """)
+            
+            if not clicked_submit:
+                print(f"[{name}] Submit button not found via JS, trying exact ID...")
+                try: 
+                    sb.execute_script("document.querySelector('#vm-submit').click();")
+                except: 
+                    pass
+
+            print(f"[{name}] Step 4: Wait for reward (45s)")
+            time.sleep(45) 
             
             print(f"[{name}] Step 5: Refresh")
             sb.refresh_page()
-            time.sleep(10)
+            time.sleep(8)
             
             final_time = get_time(sb)
             print(f"[{name}] Final time: {final_time}")
@@ -163,9 +156,9 @@ for target in TARGETS:
             if final_time != "Unknown" and final_time != time_before:
                 status = "Success"
             else:
-                status = "Unknown/Failed"
+                status = "Failed"
                 
-            sb.save_screenshot(f"screenshots/{name}_final_result.png")
+            sb.save_screenshot(f"screenshots/{name}_3_result.png")
             task_results.append({"name": name, "status": status, "time": final_time})
 
     except Exception as e:
