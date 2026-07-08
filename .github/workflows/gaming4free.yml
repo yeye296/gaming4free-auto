@@ -34,26 +34,24 @@ jobs:
           # 2. 将 Secret 写入 config.json
           echo "$PROXY_JSON" > config.json
 
-          # 3. 🌟 终极 JSON 净化手术：彻底清除 D 盘路径和空引用
+          # 3. 🌟 终极 JSON 切除手术：暴力抹除所有不兼容的 GUI 配置，只留纯净代理核心！
           python -c "
           import json
           try:
               with open('config.json', 'r', encoding='utf-8') as f: data = json.load(f)
               
-              # 切除 1：删除实验性配置中的本地缓存路径 (包含 D 盘路径)
-              if 'experimental' in data and 'cache_file' in data['experimental']:
-                  del data['experimental']['cache_file']
-                  
-              if 'route' in data:
-                  # 切除 2：彻底删除 rule_set 规则集定义 (包含 D 盘路径)
-                  if 'rule_set' in data['route']:
-                      del data['route']['rule_set']
-                  # 切除 3：删除引用了 rule_set 的路由规则，防止启动报 '规则不存在' 的致命错误
-                  if 'rules' in data['route']:
-                      data['route']['rules'] = [r for r in data['route']['rules'] if 'rule_set' not in r]
+              # 暴力切除：实验性功能 (包含 D 盘缓存路径)
+              if 'experimental' in data: del data['experimental']
+              
+              # 暴力切除：桌面端专属 DNS 配置 (包含导致闪退的 predefined 字段)
+              if 'dns' in data: del data['dns']
+              
+              # 暴力切除：桌面端路由规则 (包含 D 盘 srs 规则路径)
+              # 删掉后，sing-box 默认会将所有流量强制走第一个 outbound (即你的 vmess 代理)，完美符合需求！
+              if 'route' in data: del data['route']
                       
               with open('config.json', 'w', encoding='utf-8') as f: json.dump(data, f)
-              print('JSON 净化手术完成！')
+              print('JSON 终极截肢手术完成！当前为纯净隧道模式。')
           except Exception as e:
               print('JSON 修复失败:', e)
           "
@@ -63,8 +61,10 @@ jobs:
           
           # 5. 等待代理启动并验证
           sleep 5
-          cat proxy.log # 打印后台日志，方便排错
-          curl -x socks5h://127.0.0.1:10808 https://ifconfig.me || echo "代理连接测试失败，但继续运行"
+          cat proxy.log # 打印后台日志
+          
+          # 测试隧道是否连通，如果连通会打印出你代理节点的 IP
+          curl -x socks5h://127.0.0.1:10808 https://ifconfig.me || echo "代理连接测试失败"
 
       - name: Run script
         env:
