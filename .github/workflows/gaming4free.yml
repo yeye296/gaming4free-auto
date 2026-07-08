@@ -42,16 +42,24 @@ jobs:
           import json
           try:
               with open('config.json', 'r', encoding='utf-8') as f: data = json.load(f)
-              if 'experimental' in data: del data['experimental']
-              if 'dns' in data: del data['dns']
-              if 'route' in data: del data['route']
-              with open('config.json', 'w', encoding='utf-8') as f: json.dump(data, f)
+              
+              # 🌟 终极白名单提取：只保留核心的 inbounds 和 outbounds，彻底杜绝所有 GUI 特有字段导致闪退！
+              clean_data = {}
+              if 'log' in data: clean_data['log'] = data['log']
+              if 'inbounds' in data: clean_data['inbounds'] = data['inbounds']
+              if 'outbounds' in data: clean_data['outbounds'] = data['outbounds']
+              
+              with open('config.json', 'w', encoding='utf-8') as f: json.dump(clean_data, f)
+              print('JSON 终极白名单提取完成！当前为绝对纯净代理模式。')
           except Exception as e:
               print('JSON 修复失败:', e)
           "
           
           nohup sing-box run -c config.json > proxy.log 2>&1 &
           sleep 5
+          cat proxy.log
+          
+          # 这一步只要能打印出你代理的 IP，就说明隧道 100% 打通了！
           curl -x socks5h://127.0.0.1:10808 https://ifconfig.me || echo "代理连接测试失败，但继续运行"
 
       - name: Run Script
@@ -59,7 +67,7 @@ jobs:
           TG_TOKEN: ${{ secrets.TG_TOKEN }}
           TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
         run: |
-          # 🌟 使用 -a 参数自动分配最佳的虚拟显示器编号，完美触发 SeleniumBase 的破盾模块
+          # 使用 -a 参数自动分配最佳的虚拟显示器编号，完美触发 SeleniumBase 的破盾模块
           xvfb-run -a python renew.py
           
       - name: Upload screenshots
