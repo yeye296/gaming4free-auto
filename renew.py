@@ -41,9 +41,10 @@ class Game4FreeRenewal:
 
     def move_mouse_human(self, sb):
         try:
-            for _ in range(3):
-                sb.slow_click("body", force=True)
-                time.sleep(random.uniform(0.5, 1.2))
+            # 🌟 修复崩溃元凶：彻底移除对 body 的盲目随机点击，防止误触隐藏的全局广告导致浏览器跳转断连
+            # 仅仅稍微执行一下像素级滚动，假装有人在操作
+            sb.execute_script("window.scrollBy(0, 10); window.scrollBy(0, -10);")
+            time.sleep(random.uniform(0.5, 1.2))
         except:
             pass
 
@@ -138,7 +139,6 @@ class Game4FreeRenewal:
                 timestamp_before = self.get_remaining_time(sb)
                 self.log(f"🕒 初始时间: {timestamp_before}")
 
-                # 黄金居中滚动：确保面板完美处于中心 (保留这个完美动作)
                 sb.execute_script("window.scrollTo(0, document.body.scrollHeight / 3);")
                 
                 try:
@@ -153,24 +153,20 @@ class Game4FreeRenewal:
                     self.task_results.append({"name": region, "status": "❌ 失败 (初始按钮)", "time": "未知"})
                     return
 
-                # ================== 🌟 核心：深度穿透破盾 ==================
+                # ================== 深度穿透破盾 ==================
                 self.log("⏳ 开始迎战 Cloudflare (深度穿透模式)...")
                 cf_passed = False
-                for _ in range(12): # 给予 36 秒的破盾时间
+                for _ in range(12): 
                     try:
-                        # 确保我们在主文档
                         sb.switch_to_default_content()
                         
-                        # 组合拳 1: 盲点主页上的 iframe 容器
                         if sb.is_element_present('iframe[src*="cloudflare"]'):
                             try: sb.click('iframe[src*="cloudflare"]', timeout=1)
                             except: pass
                             
-                        # 组合拳 2: 官方 GUI 破盾
                         try: sb.uc_gui_click_captcha()
                         except: pass
                         
-                        # 组合拳 3: 切入 iframe 内部检查和贴脸点击
                         sb.switch_to_frame('iframe[src*="cloudflare"]')
                         frame_text = sb.get_text("body")
                         
@@ -181,9 +177,9 @@ class Game4FreeRenewal:
                             break
                             
                         if "Verify you are human" in frame_text or "真人" in frame_text:
-                            try: sb.click('label', timeout=1) # 尝试点击内部标签
+                            try: sb.click('label', timeout=1) 
                             except: 
-                                try: sb.click('body', timeout=1) # 盲点内部背景
+                                try: sb.click('body', timeout=1) 
                                 except: pass
                                 
                         sb.switch_to_default_content()
@@ -194,7 +190,6 @@ class Game4FreeRenewal:
                         
                 if not cf_passed:
                     self.log("⚠️ 未能侦测到明确的绿灯信号，尝试强行继续...")
-                # ============================================================
 
                 try:
                     self.log("🖱️ 正在触发最终确认按钮...")
@@ -208,9 +203,9 @@ class Game4FreeRenewal:
                     self.task_results.append({"name": region, "status": "❌ 失败 (确认按钮)", "time": "未知"})
                     return
 
-                # 耐心等待并发放奖励
-                self.log("⏳ 按钮已按下！静默等待 50 秒让视频广告发奖...")
-                time.sleep(50)
+                # 🌟 修复：增加 10 秒静默等待时间
+                self.log("⏳ 按钮已按下！静默等待 60 秒让视频广告发奖...")
+                time.sleep(60)
                 
                 self.log("🔄 奖励应已到账，刷新页面以获取最新服务器状态...")
                 sb.refresh_page()
