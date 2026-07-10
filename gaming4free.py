@@ -5,6 +5,7 @@ import re
 import random
 import requests
 
+# 智能环境配置
 if "DISPLAY" not in os.environ:
     os.environ["DISPLAY"] = ":1"
     
@@ -47,13 +48,41 @@ class Game4FreeRenewal:
     def human_wait(self, min_s=6, max_s=10):
         time.sleep(random.uniform(min_s, max_s))
 
-    def move_mouse_human(self, sb):
+    def move_mouse_human_advanced(self, sb):
+        """生成更复杂的随机鼠标移动轨迹，深度伪装真人"""
         try:
-            for _ in range(3):
-                x = random.randint(100, 800)
-                y = random.randint(100, 600)
-                sb.slow_click("body", force=True)
-                time.sleep(random.uniform(0.5, 1.2))
+            # 增加一个初始的随机延迟，让开始动作不确定
+            time.sleep(random.uniform(0.1, 0.4))
+            
+            # 使用JS在页面各处移动，并随机点击，增加交互轨迹
+            width = sb.execute_script("return window.innerWidth;")
+            height = sb.execute_script("return window.innerHeight;")
+
+            # 随机选取区域作为轨迹目标
+            regions = [
+                (0.1 * width, 0.1 * height, 0.4 * width, 0.4 * height),
+                (0.6 * width, 0.6 * height, 0.9 * width, 0.9 * height),
+                (width / 2, height / 2, width / 2, height / 2)
+            ]
+            num_paths = random.randint(2, 3)
+
+            for _ in range(num_paths):
+                target_region = random.choice(regions)
+                x_dest = random.randint(int(target_region[0]), int(target_region[2]))
+                y_dest = random.randint(int(target_region[1]), int(target_region[3]))
+                x_offset = random.randint(-5, 5)
+                y_offset = random.randint(-5, 5)
+                
+                sb.execute_script(f"""
+                    var evt = new MouseEvent("mousemove", {{
+                        bubbles: true,
+                        cancelable: true,
+                        clientX: {x_dest + x_offset},
+                        clientY: {y_dest + y_offset}
+                    }});
+                    document.body.dispatchEvent(evt);
+                """)
+                time.sleep(random.uniform(0.8, 1.5))
         except:
             pass
     
@@ -97,24 +126,35 @@ class Game4FreeRenewal:
             self.log(f"❌ TG 推送失败: {e}")
 
     def run_single_server(self, server_num, region):
-        URL_APP_PANEL = f"https://g4f.gg/{server_num}"
+        URL_APP_PANEL = f"https://gaming4free.net/servers/{server_num}"
 
         self.log("=" * 40)
         self.log(f"🚀 开始续期 [{region}] ({server_num})")
         self.log("=" * 40)
         self.log("🎯 正在启动 Chrome 浏览器...")
 
+        # 定义一个常见的桌面端 User-Agent
+        USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
+
         with SB(
             uc=True,
             test=True,
             headed=True,
+            anti_bot=True,  # 开启反反爬增强模式
             headless=False,
             xvfb=False,
-            chromium_arg="--no-sandbox,--disable-dev-shm-usage,--disable-gpu,--window-position=0,0,--start-maximized",
+            chromium_arg=f"--no-sandbox,--disable-dev-shm-usage,--disable-gpu,--window-position=0,0,--start-maximized,--disable-blink-features=AutomationControlled,--disable-infobars,--disable-popup-blocking,--user-agent={USER_AGENT}",
             proxy=PROXY_URL if PROXY_URL else None
         ) as sb:
             try:
                 self.log("✅ 浏览器已启动！")
+
+                # 在打开任何页面前，注入JS抹除 webdriver 痕迹
+                sb.add_js_snippet("""
+                    Object.defineProperty(navigator, 'webdriver', {
+                        get: () => undefined
+                    });
+                """)
 
                 # IP 检测
                 self.log("🌍 正在检测出口 IP...")
@@ -129,7 +169,7 @@ class Game4FreeRenewal:
                 # 打开续期面板
                 self.log(f"📂 正在进入续期面板 [{region}] ...")
                 sb.uc_open_with_reconnect(URL_APP_PANEL, reconnect_time=5)
-                self.human_wait(6, 10)
+                self.human_wait(8, 12)
 
                 if "login" in sb.get_current_url().lower():
                     self.log(f"❌ 权限失效。当前 URL: {sb.get_current_url()}")
@@ -158,18 +198,19 @@ class Game4FreeRenewal:
                         except:
                             pass
 
-                self.human_wait(6, 10)
+                self.human_wait(4, 7)
 
                 # 获取续期前剩余运行时间
                 timestamp_before = self.get_remaining_time(sb)
                 self.log(f"🕒 续期前剩余运行时间: {timestamp_before}")
 
-                sb.execute_script("window.scrollBy(0,1000);")
+                sb.execute_script("window.scrollBy(0,800);")
+                self.human_wait(2, 4)
 
                 # 点击 'VOTE + ADD 90 MIN'
                 try:
-                    self.log("🖱️ 正在点击 'VOTE + ADD 90 MIN'...")
-                    self.move_mouse_human(sb)
+                    self.log("🖱️ 正在使用人类轨迹点击 'VOTE + ADD 90 MIN'...")
+                    self.move_mouse_human_advanced(sb)
                     sb.wait_for_element_visible("#sd-vote-btn", timeout=10)
                     sb.click('#sd-vote-btn')
                     self.human_wait(6, 10)
@@ -180,20 +221,15 @@ class Game4FreeRenewal:
                     self.send_telegram_notify(f"未找到 'VOTE + ADD 90 MIN' 按钮 [{region}]", test2_screenshot)
                     return
 
-                # 保存点击后测试截图
-                #test_screenshot = f"{self.screenshot_dir}/test_{server_num}.png"
-                #sb.save_screenshot(test_screenshot)
-                #self.send_telegram_notify(f"服务器{server_num}测试截图", test_screenshot)
-
                 # 过cloudflare人机
-                self.log("⏳ 开始验证Cloudflare")
+                self.log("⏳ 开始验证Cloudflare (如果需要)")
                 cf_indicators = [
                     "verify you are human",
                     "确认您是真人",
                     "troubleshoot",
                     "just a moment"
                 ]
-                for i in range(10): # 尝试10次
+                for i in range(10): 
                     sb.uc_gui_click_captcha()
                     time.sleep(3)
                     page_lower = sb.get_page_source().lower()
@@ -202,25 +238,26 @@ class Game4FreeRenewal:
                         time.sleep(3)
                         page_lower = sb.get_page_source().lower()
                     if not any(x in page_lower for x in cf_indicators):
-                        self.log("✅Cloudflare验证已通过")
+                        self.log("✅ Cloudflare 验证已通过/无需验证")
                         break
 
-                # 再次点击 'VOTE + ADD 90 MIN'
-                self.log("🖱️ Cloudflare验证后再次点击 'VOTE — ADDS 90 MINUTES'...")
+                # 再次点击 'VOTE — ADDS 90 MINUTES'
+                self.human_wait(3, 5)
                 try:
-                    self.log("🖱️ 正在点击 'VOTE — ADDS 90 MINUTES'...")
-                    self.move_mouse_human(sb)
+                    self.log("🖱️ 正在点击最终提交按钮 'VOTE — ADDS 90 MINUTES'...")
+                    self.move_mouse_human_advanced(sb)
                     sb.wait_for_element_visible("#vm-submit", timeout=10)
                     sb.click('#vm-submit')
-                    self.human_wait(6, 10)
+                    self.human_wait(8, 12)
                 except Exception as e:
-                    self.log(f"❌ 未找到 'VOTE — ADDS 90 MINUTES' 按钮: {e}")
+                    self.log(f"❌ 未找到最终提交按钮: {e}")
                     test2_screenshot = f"{self.screenshot_dir}/test2_{server_num}.png"
                     sb.save_screenshot(test2_screenshot)
-                    self.send_telegram_notify(f"未找到 'VOTE — ADDS 90 MINUTES' 按钮 [{region}]", test2_screenshot)
+                    self.send_telegram_notify(f"未找到最终提交按钮 [{region}]", test2_screenshot)
                     return
 
                 time.sleep(10)
+                
                 # 保存最终截图
                 final_screenshot = f"{self.screenshot_dir}/final_success_{server_num}.png"
                 sb.save_screenshot(final_screenshot)
@@ -230,7 +267,7 @@ class Game4FreeRenewal:
                 self.log(f"🕒 续期后剩余运行时间: {timestamp_after}")
 
                 # TG通知
-                msg = f"✅ [{region}] 续期成功\n🖥️ 编号: {server_num}\n🕒 续期前剩余运行时间: {timestamp_before}\n🎉 续期后剩余运行时间: {timestamp_after}"
+                msg = f"✅ [{region}] 续期成功\n🖥️ 编号: {server_num}\n🕒 续期前剩余时间: {timestamp_before}\n🎉 续期后剩余时间: {timestamp_after}"
                 self.send_telegram_notify(msg, final_screenshot)
 
             except Exception as e:
