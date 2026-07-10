@@ -13,16 +13,13 @@ if "XAUTHORITY" not in os.environ:
     if os.path.exists("/home/headless/.Xauthority"):
         os.environ["XAUTHORITY"] = "/home/headless/.Xauthority"
 
-print(f"[DEBUG] Env DISPLAY: {os.environ.get('DISPLAY')}")
-print(f"[DEBUG] Env XAUTHORITY: {os.environ.get('XAUTHORITY')}")
-
 from seleniumbase import SB
 
 # ================= 配置区域 =================
-PROXY_URL = os.getenv("PROXY", "")  # 代理
-TG_TOKEN = os.getenv("TG_TOKEN")  # tg通知token
-TG_CHAT_ID = os.getenv("TG_CHAT_ID")  # tg通知chat_id
-SERVERS = os.getenv("SERVERS", "").strip()  # 服务器列表: NUM1,地区1|NUM2,地区2
+PROXY_URL = os.getenv("PROXY", "")  
+TG_TOKEN = os.getenv("TG_TOKEN")  
+TG_CHAT_ID = os.getenv("TG_CHAT_ID")  
+SERVERS = os.getenv("SERVERS", "").strip()  
 
 SERVER_LIST = []
 if SERVERS:
@@ -48,17 +45,34 @@ class Game4FreeRenewal:
     def human_wait(self, min_s=6, max_s=10):
         time.sleep(random.uniform(min_s, max_s))
 
-    def move_mouse_human_advanced(self, sb):
-        """生成更复杂的随机鼠标移动轨迹，深度伪装真人"""
+    def time_to_seconds(self, t_str):
+        """将 HH:MM:SS 格式转换为秒数，用于严格校验续期是否生效"""
         try:
-            # 增加一个初始的随机延迟，让开始动作不确定
+            h, m, s = map(int, t_str.strip().split(':'))
+            return h * 3600 + m * 60 + s
+        except:
+            return 0
+
+    def remove_ads(self, sb):
+        """强力清理页面广告，防止遮挡 CF 验证码和点击按钮"""
+        try:
+            sb.execute_script("""
+                var ads = document.querySelectorAll('ins, iframe[src*="google"], iframe[src*="doubleclick"], div[id^="google_ads"], div[class*="ad-"], div[id^="ad_"]');
+                for (var i = 0; i < ads.length; i++) {
+                    ads[i].remove();
+                }
+            """)
+            self.log("🧹 已强制清理悬浮广告，防止拦截鼠标点击。")
+        except:
+            pass
+
+    def move_mouse_human_advanced(self, sb):
+        """生成更复杂的随机鼠标移动轨迹"""
+        try:
             time.sleep(random.uniform(0.1, 0.4))
-            
-            # 使用JS在页面各处移动，并随机点击，增加交互轨迹
             width = sb.execute_script("return window.innerWidth;")
             height = sb.execute_script("return window.innerHeight;")
 
-            # 随机选取区域作为轨迹目标
             regions = [
                 (0.1 * width, 0.1 * height, 0.4 * width, 0.4 * height),
                 (0.6 * width, 0.6 * height, 0.9 * width, 0.9 * height),
@@ -92,26 +106,21 @@ class Game4FreeRenewal:
             sb.wait_for_element_visible('#sd-timer', timeout=15)
             time.sleep(1)
             remaining_text = sb.get_text('#sd-timer').strip()
-            self.log(f"✅ 获取剩余时间成功: {remaining_text}")
         except Exception as e:
-            self.log(f"⚠️ 获取剩余时间失败: {e}")
             try:
                 remaining_text = sb.execute_script("""
                     var el = document.querySelector('#sd-timer');
                     return el ? el.innerText.trim() : null;
                 """)
-                if remaining_text:
-                    self.log(f"✅ JS获取剩余时间成功: {remaining_text}")
-                else:
+                if not remaining_text:
                     remaining_text = "未知"
-            except Exception as js_e:
-                self.log(f"⚠️ JS获取失败: {js_e}")
+            except:
                 remaining_text = "未知"
         return remaining_text
 
     def send_telegram_notify(self, message, photo_path=None):
         if not TG_TOKEN or not TG_CHAT_ID:
-            self.log("⚠️ 未配置 TG_TOKEN 或 TG_CHAT_ID，跳过推送。")
+            self.log("⚠️ 未配置 TG_TOKEN，跳过推送。")
             return
         try:
             if photo_path and os.path.exists(photo_path):
@@ -130,10 +139,7 @@ class Game4FreeRenewal:
 
         self.log("=" * 40)
         self.log(f"🚀 开始续期 [{region}] ({server_num})")
-        self.log("=" * 40)
-        self.log("🎯 正在启动 Chrome 浏览器...")
-
-        # 定义一个常见的桌面端 User-Agent
+        
         USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
 
         with SB(
@@ -148,58 +154,41 @@ class Game4FreeRenewal:
             try:
                 self.log("✅ 浏览器已启动！")
 
-                # IP 检测
-                self.log("🌍 正在检测出口 IP...")
                 try:
                     sb.open("https://api.ipify.org?format=json")
                     ip_val = json.loads(re.search(r'\{.*\}', sb.get_text("body")).group(0)).get('ip', 'Unknown')
                     parts = ip_val.split('.')
                     self.log(f"✅ 当前出口 IP: {parts[0]}.{parts[1]}.***.{parts[-1]}")
                 except:
-                    self.log("⚠️ IP 检测跳过...")
+                    pass
 
-                # 打开续期面板
                 self.log(f"📂 正在进入续期面板 [{region}] ...")
                 sb.uc_open_with_reconnect(URL_APP_PANEL, reconnect_time=5)
                 self.human_wait(8, 12)
 
                 if "login" in sb.get_current_url().lower():
-                    self.log(f"❌ 权限失效。当前 URL: {sb.get_current_url()}")
-                    sb.save_screenshot(f"{self.screenshot_dir}/login_fail_{server_num}.png")
-                    self.send_telegram_notify(
-                        f"❌ [{region}] 登录状态失效\n🖥️ 编号: {server_num}",
-                        f"{self.screenshot_dir}/login_fail_{server_num}.png"
-                    )
-                    return
+                    raise Exception("登录状态失效或权限被拒绝。")
 
-                cookie_btns = [
-                    '//button[contains(., "Continue with Recommended Cookies")]',
-                    '//button[contains(., "Recommended Cookies")]',
-                    '//button[contains(., "Accept")]',
-                    '//button[contains(., "I Agree")]',
-                    '//button[contains(., "Consent")]',
-                    '//button[contains(., "Got it")]',
-                ]
-
+                # 关闭各类 Cookies 提示
+                cookie_btns = ['//button[contains(., "Continue with Recommended Cookies")]', '//button[contains(., "Accept")]', '//button[contains(., "I Agree")]', '//button[contains(., "Consent")]']
                 for btn in cookie_btns:
                     if sb.is_element_present(btn):
                         try:
                             sb.click(btn)
-                            self.log("🍪 已关闭 Cookie")
                             break
                         except:
                             pass
 
-                self.human_wait(4, 7)
-
-                # 获取续期前剩余运行时间
+                # 获取续期前时间
                 timestamp_before = self.get_remaining_time(sb)
                 self.log(f"🕒 续期前剩余运行时间: {timestamp_before}")
 
                 sb.execute_script("window.scrollBy(0,800);")
                 self.human_wait(2, 4)
+                
+                # 💥 【防御策略 1】首次清理广告
+                self.remove_ads(sb)
 
-                # 点击 'VOTE + ADD 90 MIN'
                 try:
                     self.log("🖱️ 正在使用人类轨迹点击 'VOTE + ADD 90 MIN'...")
                     self.move_mouse_human_advanced(sb)
@@ -207,73 +196,68 @@ class Game4FreeRenewal:
                     sb.click('#sd-vote-btn')
                     self.human_wait(6, 10)
                 except Exception as e:
-                    self.log(f"❌ 未找到 'VOTE + ADD 90 MIN' 按钮: {e}")
-                    test2_screenshot = f"{self.screenshot_dir}/test2_{server_num}.png"
-                    sb.save_screenshot(test2_screenshot)
-                    self.send_telegram_notify(f"未找到 'VOTE + ADD 90 MIN' 按钮 [{region}]", test2_screenshot)
-                    return
+                    raise Exception(f"未找到打开模态框的按钮: {e}")
 
-                # 过cloudflare人机
-                self.log("⏳ 开始验证Cloudflare (如果需要)")
-                cf_indicators = [
-                    "verify you are human",
-                    "确认您是真人",
-                    "troubleshoot",
-                    "just a moment"
-                ]
-                for i in range(10): 
-                    sb.uc_gui_click_captcha()
-                    time.sleep(3)
-                    page_lower = sb.get_page_source().lower()
-                    if any(x in page_lower for x in cf_indicators):
-                        sb.uc_gui_handle_captcha()
-                        time.sleep(3)
-                        page_lower = sb.get_page_source().lower()
-                    if not any(x in page_lower for x in cf_indicators):
-                        self.log("✅ Cloudflare 验证已通过/无需验证")
-                        break
+                # 💥 【防御策略 2】再次清理弹窗里跟着一起加载出来的贴片广告
+                self.remove_ads(sb)
 
-                # 再次点击 'VOTE — ADDS 90 MINUTES'
+                # 处理 Cloudflare 验证码 (真实 Iframe 探测法)
+                self.log("⏳ 探测是否加载了 Cloudflare Turnstile...")
+                cf_iframe_selector = 'iframe[src*="cloudflare"], iframe[title*="Cloudflare"]'
+                
+                if sb.is_element_present(cf_iframe_selector):
+                    self.log("🛡️ 发现 Cloudflare 验证框，正在尝试破解...")
+                    for _ in range(3):
+                        try:
+                            # 尝试将验证框滚动到可视区域中央
+                            sb.scroll_into_view(cf_iframe_selector)
+                        except:
+                            pass
+                        # 使用原生的 GUI 点击来勾选 checkbox
+                        sb.uc_gui_click_captcha()
+                        time.sleep(4)
+                else:
+                    self.log("✅ 未检测到验证框，当前 IP 暂时安全。")
+
                 self.human_wait(3, 5)
+
                 try:
                     self.log("🖱️ 正在点击最终提交按钮 'VOTE — ADDS 90 MINUTES'...")
-                    self.move_mouse_human_advanced(sb)
                     sb.wait_for_element_visible("#vm-submit", timeout=10)
                     sb.click('#vm-submit')
                     self.human_wait(8, 12)
                 except Exception as e:
-                    self.log(f"❌ 未找到最终提交按钮: {e}")
-                    test2_screenshot = f"{self.screenshot_dir}/test2_{server_num}.png"
-                    sb.save_screenshot(test2_screenshot)
-                    self.send_telegram_notify(f"未找到最终提交按钮 [{region}]", test2_screenshot)
-                    return
+                    raise Exception("未能点击最终的确认提交按钮。")
 
-                time.sleep(10)
+                time.sleep(8)
                 
-                # 保存最终截图
-                final_screenshot = f"{self.screenshot_dir}/final_success_{server_num}.png"
-                sb.save_screenshot(final_screenshot)
-
-                # 获取续期后剩余运行时间
+                # 获取续期后时间
                 timestamp_after = self.get_remaining_time(sb)
                 self.log(f"🕒 续期后剩余运行时间: {timestamp_after}")
 
-                # TG通知
+                # 💥 【防御策略 3】严格校验续期是否真实生效
+                sec_before = self.time_to_seconds(timestamp_before)
+                sec_after = self.time_to_seconds(timestamp_after)
+                
+                if sec_after > 0 and sec_before > 0:
+                    if sec_after <= sec_before + 120:  # 允许最多 2 分钟的容差（脚本运行流逝的时间）
+                        raise Exception("时间并未增加！人机验证失败或提交请求被服务器拦截。")
+
+                final_screenshot = f"{self.screenshot_dir}/final_success_{server_num}.png"
+                sb.save_screenshot(final_screenshot)
+
                 msg = f"✅ [{region}] 续期成功\n🖥️ 编号: {server_num}\n🕒 续期前剩余时间: {timestamp_before}\n🎉 续期后剩余时间: {timestamp_after}"
                 self.send_telegram_notify(msg, final_screenshot)
 
             except Exception as e:
                 self.log(f"❌ 运行异常: {e}")
-                import traceback
-                traceback.print_exc()
                 sb.save_screenshot(f"{self.screenshot_dir}/error_{server_num}.png")
-                self.send_telegram_notify(f"❌ [{region}] 执行异常\n🖥️ 编号: {server_num}", f"{self.screenshot_dir}/error_{server_num}.png")
+                self.send_telegram_notify(f"❌ [{region}] 执行失败: {e}\n🖥️ 编号: {server_num}", f"{self.screenshot_dir}/error_{server_num}.png")
 
     def run(self):
         if not SERVER_LIST:
             self.log("❌ 未配置 SERVERS")
             return
-
         for server in SERVER_LIST:
             self.run_single_server(server["num"], server["region"])
 
