@@ -46,3 +46,12 @@ jobs:
       run: |
         # 使用 xvfb 运行以支持强力过人机验证模式
         xvfb-run -a python gaming4free.py
+
+    - name: 上传截图产物
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: screenshots-${{ github.run_number }}
+        path: artifacts/*.png
+        if-no-files-found: ignore
+        retention-days: 7
