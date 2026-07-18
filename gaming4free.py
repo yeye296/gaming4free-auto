@@ -150,7 +150,8 @@ class Game4FreeRenewal:
                     pass
 
                 self.log(f"📂 正在进入续期面板 [{region}] ...")
-                sb.uc_open_with_reconnect(URL_APP_PANEL, reconnect_time=5)
+                sb.open(URL_APP_PANEL)
+                # sb.uc_open_with_reconnect(URL_APP_PANEL, reconnect_time=5)
                 self.human_wait(8, 12)
 
                 if "login" in sb.get_current_url().lower():
@@ -190,11 +191,11 @@ class Game4FreeRenewal:
 
                 self.log("📡 开始扫描")
                 cf_found = False
-                for _ in range(5):
+                for _ in range(15):
                     if sb.execute_script("return !!document.querySelector('iframe[src*=\"challenges.cloudflare.com\"], iframe[src*=\"turnstile\"], [name=\"cf-turnstile-response\"]')"):
                         cf_found = True
                         break
-                    time.sleep(1)
+                    time.sleep(2)
 
                 debug_screenshot = f"{self.screenshot_dir}/turnstile_before_{server_num}.png"
                 sb.save_screenshot(debug_screenshot)
@@ -216,11 +217,8 @@ class Game4FreeRenewal:
                     self.log("⚠️ 深度扫描未发现验证框，尝试直接点击。")
                     for attempt in range(5):
                         try:
-                            # 调动虚拟显示器 Xvfb 的底层鼠标进行真实的 GUI 点击
                             sb.uc_gui_click_captcha()
                             time.sleep(4)
-                            
-                            # 终极校验：读取 DOM，如果有了凭证值，说明一定点成功了
                             token = sb.execute_script("return document.querySelector('[name=\"cf-turnstile-response\"]') ? document.querySelector('[name=\"cf-turnstile-response\"]').value : ''")
                             if token:
                                 self.log("✅ Turnstile 验证已成功，顺利获取 Token 凭证！")
