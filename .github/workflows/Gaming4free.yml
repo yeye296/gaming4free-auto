@@ -30,35 +30,16 @@ jobs:
       run: |
         seleniumbase install chromedriver
 
-    - name: Setup Proxy Tunnel (Xray-core)
-      env:
-        XRAY_CONFIG: ${{ secrets.XRAY_CONFIG }} 
-      run: |
-        # 下载并解压 Xray-core
-        wget -q https://github.com/XTLS/Xray-core/releases/latest/download/Xray-linux-64.zip
-        unzip -q Xray-linux-64.zip -d xray
-        chmod +x xray/xray
-        
-        # 使用 printenv 完美写入配置，避免任何字符转义和空格导致的崩溃
-        printenv XRAY_CONFIG > xray/config.json
-        
-        # 后台启动 Xray
-        nohup ./xray/xray run -c xray/config.json > xray.log 2>&1 &
-        sleep 5
-        
-        # 检查 Xray 进程是否存活
-        if ! pgrep -x "xray" > /dev/null; then
-            echo "❌ Xray 进程未启动或已崩溃！查看报错日志："
-            cat xray.log
-            exit 1
-        fi
-        
-        # 测试节点连通性
-        curl -il -x socks5://127.0.0.1:10808 https://api.ipify.org || (echo "❌ 代理测试失败，查看 Xray 日志:" && cat xray.log && exit 1)
+    - name: ⚙ 设置代理 (sing-box)
+        continue-on-error: true
+        env:
+          NODE_LINK: ${{ secrets.NODE_LINK }}
+        run: |
+          bash setup_proxy.sh
 
     - name: Run Script
       env:
-        PROXY: socks5://127.0.0.1:10808
+        PROXY: socks5://127.0.0.1:1080
         TG_TOKEN: ${{ secrets.TG_TOKEN }}      
         TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}  
         SERVERS: ${{ secrets.SERVERS }}  
