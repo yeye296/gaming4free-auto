@@ -2,7 +2,8 @@ name: G4F Renew
 
 on:
   schedule:
-    - cron: '0 * * * *'  # 每 1 小时运行一次，可根据需要自行调整
+    - cron: '3 * * * *'  
+    - cron: '33 * * * *'  
   workflow_dispatch: # 允许手动触发
 
 jobs:
