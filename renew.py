@@ -30,6 +30,18 @@ def send_unified_tg(results):
         except Exception as e:
             print(f"发送通知失败: {e}")
 
+def get_remaining_time(sb):
+    try:
+        sb.wait_for_element_visible('#sd-timer', timeout=15)
+        time.sleep(1)
+        return sb.get_text('#sd-timer').strip()
+    except:
+        try:
+            res = sb.execute_script("var el = document.querySelector('#sd-timer'); return el ? el.innerText.trim() : null;")
+            return res if res else "未知"
+        except:
+            return "未知"
+
 print("\n===== 开始执行 =====")
 
 proxy_str = "socks5://127.0.0.1:40000"
@@ -53,6 +65,9 @@ for target in TARGETS:
             
             os.makedirs("screenshots", exist_ok=True)
             sb.save_screenshot(f"screenshots/{name}_1_page_loaded.png")
+
+            t_before = get_remaining_time(sb)
+            print(f"🕒 续期前剩余时间: {t_before}")
 
             print("尝试点击初始续期按钮...")
             js_click_code = """
