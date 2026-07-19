@@ -1,0 +1,88 @@
+name: Game4Free-Renew
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '10 1 * * *'
+
+jobs:
+  renew:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: 📥 下载仓库脚本
+        uses: actions/checkout@v4
+
+      - name: 🐍 设置 Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      # - name: 📦 下载 GOST
+      #   run: |
+      #     VERSION=$(curl -s https://api.github.com/repos/ginuerzh/gost/releases/latest \
+      #       | grep '"tag_name"' | cut -d'"' -f4 | tr -d 'v')
+      #     echo "📦 GOST 版本: $VERSION"
+      #     wget -q "https://github.com/ginuerzh/gost/releases/download/v${VERSION}/gost_${VERSION}_linux_amd64.tar.gz"
+      #     tar -xzf "gost_${VERSION}_linux_amd64.tar.gz"
+      #     chmod +x gost
+
+      # - name: ⚙ 设置代理 (sing-box)
+      #   continue-on-error: true
+      #   env:
+      #     NODE_LINK: ${{ secrets.NODE_LINK }}
+      #   run: |
+      #     bash setup_proxy.sh
+
+      # =========================
+      # 🟡 1️⃣ 安装官方 WARP 客户端 (纯 SOCKS5 模式)
+      # =========================
+      - name: Setup Official WARP Proxy
+        run: |
+          # 导入 Cloudflare 官方源并安装
+          curl -fsSL https://pkg.cloudflareclient.com/pubkey.gpg | sudo gpg --yes --dearmor --output /usr/share/keyrings/cloudflare-warp-archive-keyring.gpg
+          echo "deb [arch=amd64 signed-by=/usr/share/keyrings/cloudflare-warp-archive-keyring.gpg] https://pkg.cloudflareclient.com/ jammy main" | sudo tee /etc/apt/sources.list.d/cloudflare-client.list
+          sudo apt-get update && sudo apt-get install -y cloudflare-warp
+          
+          # 注册并设置为纯代理模式 (默认占用 40000 端口，绝不断网)
+          warp-cli --accept-tos registration new
+          warp-cli --accept-tos mode proxy
+          warp-cli --accept-tos connect
+          
+          echo "⏳ 等待 WARP 隧道建立 (10秒)..."
+          sleep 10
+
+      - name: 🛠️ 安装系统依赖
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y \
+            google-chrome-stable \
+            xvfb \
+            xdotool
+
+      - name: 🐍 安装 Python 依赖
+        run: pip install seleniumbase
+
+      - name: 🔧 安装 ChromeDriver
+        run: seleniumbase install chromedriver
+
+      - name: 🚀 运行续期脚本
+        env:
+          PYTHONIOENCODING: utf-8
+          TG_BOT: ${{ secrets.TG_BOT }}
+          # GAME4FREE_ACCOUNT: ${{ secrets.GAME4FREE_ACCOUNT }}
+          GAME4FREE_PROXY: ${{ secrets.GAME4FREE_PROXY }}
+          # PROXY_SERVER: "http://127.0.0.1:1081"
+          PROXY_SERVER: "socks5://127.0.0.1:40000"
+        run: |
+          xvfb-run --auto-servernum --server-args="-screen 0 1920x1080x24" \
+            python game4free_renew.py
+
+      - name: 📸 上传截图
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: debug-screenshots
+          path: "*.png"
+          if-no-files-found: ignore
+          retention-days: 7
