@@ -131,11 +131,11 @@ class Game4FreeRenewal:
 
         with SB(
             uc=True,
-            # test=True,
-            # headed=True,
+            test=True,
+            headed=True,
             headless=False,
-            # xvfb=False,
-            # chromium_arg=f"--no-sandbox,--disable-dev-shm-usage,--disable-gpu,--window-position=0,0,--start-maximized,--disable-blink-features=AutomationControlled,--disable-infobars,--disable-popup-blocking,--user-agent={USER_AGENT}",
+            xvfb=False,
+            chromium_arg=f"--no-sandbox,--disable-dev-shm-usage,--disable-gpu,--window-position=0,0,--start-maximized,--disable-blink-features=AutomationControlled,--disable-infobars,--disable-popup-blocking,--user-agent={USER_AGENT}",
             proxy=PROXY_URL if PROXY_URL else None
         ) as sb:
             try:
@@ -150,8 +150,7 @@ class Game4FreeRenewal:
                     pass
 
                 self.log(f"📂 正在进入续期面板 [{region}] ...")
-                sb.open(URL_APP_PANEL)
-                # sb.uc_open_with_reconnect(URL_APP_PANEL, reconnect_time=5)
+                sb.uc_open_with_reconnect(URL_APP_PANEL, reconnect_time=5)
                 self.human_wait(8, 12)
 
                 if "login" in sb.get_current_url().lower():
@@ -191,18 +190,15 @@ class Game4FreeRenewal:
 
                 self.log("📡 开始扫描")
                 cf_found = False
-                for _ in range(15):
+                for _ in range(5):
                     if sb.execute_script("return !!document.querySelector('iframe[src*=\"challenges.cloudflare.com\"], iframe[src*=\"turnstile\"], [name=\"cf-turnstile-response\"]')"):
                         cf_found = True
                         break
-                    time.sleep(2)
-
-                debug_screenshot = f"{self.screenshot_dir}/turnstile_before_{server_num}.png"
-                sb.save_screenshot(debug_screenshot)
+                    time.sleep(1)
 
                 if cf_found:
                     self.log("🛡️ 锁定 Cloudflare 验证框，执行点击...")
-                    for attempt in range(5):
+                    for attempt in range(3):
                         try:
                             sb.uc_gui_click_captcha()
                             time.sleep(4)
@@ -214,21 +210,7 @@ class Game4FreeRenewal:
                             self.log(f"⚠️ 破解尝试 {attempt+1} 出现小偏差，继续重试...")
                         time.sleep(2)
                 else:
-                    self.log("⚠️ 深度扫描未发现验证框，尝试直接点击。")
-                    for attempt in range(5):
-                        try:
-                            sb.uc_gui_click_captcha()
-                            time.sleep(4)
-                            token = sb.execute_script("return document.querySelector('[name=\"cf-turnstile-response\"]') ? document.querySelector('[name=\"cf-turnstile-response\"]').value : ''")
-                            if token:
-                                self.log("✅ Turnstile 验证已成功，顺利获取 Token 凭证！")
-                                break
-                        except Exception as e:
-                            self.log(f"⚠️ 破解尝试 {attempt+1} 出现小偏差，继续重试...")
-                        time.sleep(2)
-
-                debug_screenshot = f"{self.screenshot_dir}/turnstile_after_{server_num}.png"
-                sb.save_screenshot(debug_screenshot)
+                    self.log("✅ 扫描未发现验证框，当前 IP 免检。")
                 # ========================================================
 
                 self.human_wait(2, 4)
