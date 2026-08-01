@@ -37,8 +37,8 @@ jobs:
           token: ${{ github.token }}
           repository: ${{ github.repository }}
           retain_days: 0
-          keep_minimum_runs: 1  # 💡 自身只保留最新 1 次
-          delete_workflow_pattern: 'Delete old workflow runs'  # 💡 匹配自身的名字（或填 yml 文件名，如 cleanup-runs.yml）
+          keep_minimum_runs: 0  # 💡 设为 0，旧的历史全删，跑完后就只剩本次这 1 条
+          delete_workflow_pattern: ${{ github.workflow }}  # 💡 自动获取当前工作流的名称/路径
 
       # 步骤 3：清理【其他激活状态】的工作流，保留最近 7 次记录
       - name: Delete runs for active workflows
