@@ -28,6 +28,7 @@ jobs:
           repository: ${{ github.repository }}
           retain_days: 0         # 不按天数保留
           keep_minimum_runs: 7   # 保留最近的 7 次记录
+          delete_workflow_by_state_pattern: ALL  # 💡 关键：包含所有状态（包括已禁用、已删除的工作流）
 
       # 第三步：更新保活时间戳并提交
       - name: Update keep-alive timestamp
